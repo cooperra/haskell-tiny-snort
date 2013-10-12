@@ -96,7 +96,14 @@ doSnort rulesContents pcapContents configContents =
 debugConcat contents1 contents2 contents3 =
     concat $ map (take 20) [contents1,contents2,contents3]
 
-parseConfig configContents = testConfig --TODO
+-- testConfig is hardcoded and was used for testing here
+parseConfig configContents = 
+     let tokenizedNoComments = filter ((/='#') . (!!0) . (!!0)) . map tokenizeBash . filter (/="") . lines $ configContents
+         foldHelper = (\ mapping tokenizedLine ->
+                           let var = '$': (tokenizedLine !! 1)
+                               val = replaceMany mapping $ tokenizedLine !! 2
+                           in Map.insert var val mapping)
+     in foldl foldHelper Map.empty tokenizedNoComments
     
 parseRules :: String -> Map.Map String String -> [Rule]
 parseRules rulesContents configMap =
