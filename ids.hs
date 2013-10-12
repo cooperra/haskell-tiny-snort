@@ -81,11 +81,20 @@ descriptions alerts =
 
 main = do
   args <- getArgs
-  let pcapFilename:rulesFilename:configFilename:outFilename:[] = args
-  pcapContents <- readFile pcapFilename
-  rulesContents <- readFile rulesFilename
-  configContents <- readFile configFilename
-  writeFile outFilename (doSnort rulesContents pcapContents configContents)
+  case args of
+    [pcapFilename,rulesFilename,configFilename,outFilename] -> 
+        do
+          pcapContents <- readFile pcapFilename
+          rulesContents <- readFile rulesFilename
+          configContents <- readFile configFilename
+          writeFile outFilename (doSnort rulesContents pcapContents configContents)
+    [pcapFilename,rulesFilename,configFilename] -> 
+        do
+          pcapContents <- readFile pcapFilename
+          rulesContents <- readFile rulesFilename
+          configContents <- readFile configFilename
+          putStrLn (doSnort rulesContents pcapContents configContents)
+    _ -> putStrLn "Usage: ids.exe PCAP_FILE RULES_FILE CONF_FILE [OUT_FILE]\n\nNote that PCAP_FILE must be human a readable output file from snort."
 
 doSnort rulesContents pcapContents configContents =
   let configMap = (parseConfig configContents)
