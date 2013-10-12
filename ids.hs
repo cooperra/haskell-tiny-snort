@@ -8,21 +8,23 @@ import qualified Data.Char as Char -- toUpper
 -- USAGE 
 -- ids.exe packetfile rulesfile configfile outputfile
 
-data Rule = AlertRule { protocol'AlertRule :: String
+data Rule = AlertRule { sid :: String
+                      , message :: String
+                      , protocol'AlertRule :: String
                       , srcIP'AlertRule :: String
                       , srcPorts :: [String]
                       , destIP'AlertRule :: String
                       , destPorts :: [String]
-                      , message :: String
                       } deriving (Show)
-data Alert = Alert { sid :: String
+data Alert = Alert { packetID :: String
                    , connection'Alert :: Connection
                    , rule :: Rule
                    , datetime'Alert :: String
                    , origin :: String
                    , description :: String
                    } deriving (Show)
-data Packet = Packet { datetime'Packet :: String
+data Packet = Packet { id'Packet :: String
+                     , datetime'Packet :: String
                      , connection :: Connection
                      } deriving (Show)
 data Connection = Connection { protocol'Connection :: String
@@ -32,7 +34,7 @@ data Connection = Connection { protocol'Connection :: String
                              , destPort :: Maybe String
                              } deriving (Show)
 
--- Constant for testing
+-- Hardcoded
 testConfig = Map.fromList $ [("$HOME_NET","10.10.10.2")
                             ,("$EXTERNAL_NET", "10.10.10.11")
                             ,("$SMTP_SERVERS","10.10.10.2")
@@ -40,12 +42,34 @@ testConfig = Map.fromList $ [("$HOME_NET","10.10.10.2")
                             ,("$SQL_SERVERS","10.10.10.2")
                             ,("$TELNET_SERVERS","10.10.10.2")
                             ,("$HTTP_PORTS","[80,81]")]
+getHardcodedOrigin sid = 
+    deMaybe "Unknown" id $ Map.lookup sid $ Map.fromList [("105","External")
+                                                 ,("254","External")
+                                                 ,("463","External")
+                                                 ,("669","External")
+                                                 ,("693","External")
+                                                 ,("709","External")
+                                                 ,("813","External")
+                                                 ,("1685","External")
+                                                 ,("1776","External")
+                                                 ,("26924","Internal")]
+getHardcodedDescription sid = 
+    deMaybe "Unknown" id $ Map.lookup sid $ Map.fromList [("105","This client program of a backdoor malware executes commands on a remote computer infected with the server program. This program enables a remote hacker to have full access to the files on the system where the backdoor server program is installed.")
+                                                 ,("254","This is presumably from an attacker engaged in a race condition to respond to a legitimate DNS query. An attacker may sniff a DNS query requeting an address record and attempt to respond before an actual DNS server can. The spoofed response is atypical because it does not include the authoritative DNS servers in the returned record. A legitimate DNS response will likely return the names of the authoritative DNS servers. The response associated with this traffic has a DNS time-to-live value of one minute. It is suspected that the TTL is set to expire quickly to eliminate any evidence of the spoofed response.")
+                                                 ,("463","ICMP Type 7 is not defined for use and is not expected network activity. Any ICMP datagram with an undefined ICMP Code should be investigated.")
+                                                 ,("669","Sendmail 8.6.10 and earlier versions contain a vulnerability related to the parsing of linefeed characters in commands passed from ident to Sendmail. An attacker can use a specially crafted command with linefeeds in an ident response to Sendmail. The message is not properly parsed and Sendmail forwards the response, with included commands, to its queue. The commands are then executed while the message awaits delivery in the Sendmail queue, causing the included arbitrary code to be executed on the server in the security context of Sendmail.")
+                                                 ,("693","This event is generated when an attacker issues a special command to an SQL database that may result in a serious compromise of all data stored on that system.\n\nSuch commands may be used to gain access to a system with the privileges of an administrator, delete data, add data, add users, delete users, return sensitive information or gain intelligence on the server software for further system compromise.\n\nThis connection can either be a legitimate telnet connection or the result of spawning a remote shell as a consequence of a successful network exploit.")
+                                                 ,("709","This event is generated when an attempt is made to login to a server using the username 4Dgifts via Telnet. This is a default account on some SGI based machines. The password may also be 4Dgifts or it may not have a password assigned.\n\nRepeated events from this rule may indicate a determined effort to guess the password for this account.")
+                                                 ,("813","Directory traversal attacks usually target web, web applications and ftp servers that do not correctly check the path to a file when requested by the client.\n\nThis can lead to the disclosure of sensitive system information which may be used by an attacker to further compromise the system.")
+                                                 ,("1685","This event is generated when an attacker issues a special command to an Oracle database that may result in a serious compromise of all data stored on that system.\n\nSuch commands may be used to gain access to a system with the privileges of an administrator, delete data, add data, add users, delete users, return sensitive information or gain intelligence on the server software for further system compromise.\n\nThis connection can either be a legitimate telnet connection or the result of spawning a remote shell as a consequence of a successful network exploit.\n\nOracle servers running on a Windows platform may listen on any arbitrary port. Change the $ORACLE_PORTS variable in snort.conf to \"any\" if this is applicable to the protected network.")
+                                                 ,("1776","This event is generated when the MySQL command 'show' is used to garner a list of MySQL databases being served by the MySQL daemon.\n\nThis connection can either be a legitimate telnet connection or the result of spawning a remote shell as a consequence of a successful network exploit.")
+                                                 ,("26924","No documentation available.")]
 
 showPretty :: Alert -> String
 showPretty alert =
-    let (Alert sid (Connection protocol srcIP srcPort destIP destPort) (AlertRule _ _ _ _ _ message) datetime origin description) = alert
+    let (Alert packetID (Connection protocol srcIP srcPort destIP destPort) (AlertRule sid message _ _ _ _ _) datetime origin description) = alert
         portFunc = deMaybe "None" id
-    in "Alert: \"" ++ message ++ "\" [" ++ sid ++ "] in packet id: " ++ sid ++ "\nDetected: " ++ datetime ++ "\nProtocol: " ++ protocol ++ "\nSource IP: " ++ srcIP ++ "\nSource port: " ++ (portFunc srcPort) ++ "\nDestination IP: " ++ destIP ++ "\nDestination port: " ++ (portFunc destPort) ++ "\nOrigin: " ++ origin ++ "\nDescription: " ++ description ++ "\n\n"
+    in "Alert: \"" ++ message ++ "\" [" ++ sid ++ "] in packet id: " ++ packetID ++ "\nDetected: " ++ datetime ++ "\nProtocol: " ++ protocol ++ "\nSource IP: " ++ srcIP ++ "\nSource port: " ++ (portFunc srcPort) ++ "\nDestination IP: " ++ destIP ++ "\nDestination port: " ++ (portFunc destPort) ++ "\nOrigin: " ++ origin ++ "\nDescription: " ++ description ++ "\n\n"
 
 deMaybe :: y -> (x -> y) -> Maybe x -> y
 deMaybe ifNothing _ Nothing = ifNothing
@@ -54,7 +78,6 @@ deMaybe _ ifSomething (Just something) = ifSomething something
 descriptions :: [Alert] -> String
 descriptions alerts =
     foldr (++) "" . map showPretty $ alerts
---TODO separate with newlines
 
 main = do
   args <- getArgs
@@ -81,9 +104,10 @@ parseRules rulesContents configMap =
 
 parseRule :: Map.Map String String -> String -> Rule
 parseRule configMap ruleLine =
-    AlertRule protocol srcIP (splitPorts srcPorts) destIP (splitPorts destPorts) message
+    AlertRule sid message protocol srcIP (splitPorts srcPorts) destIP (splitPorts destPorts)
     where ["alert", protocol, srcIP, srcPorts, "->", destIP, destPorts] = map (replaceMany configMap) . tokenizeBash . takeWhile (/='(') $ ruleLine
           extraSettings = parseExtra $ dropWhile (/='(') ruleLine
+          sid = deMaybe "None" id (Map.lookup "sid" extraSettings)
           message = deMaybe "None" id (Map.lookup "msg" extraSettings)
                                                                                 
 splitPorts ('[':ports) =
@@ -127,11 +151,13 @@ parsePcap pcapContents =
 parsePacket :: String -> Packet
 parsePacket packetStr = 
     let (line1:line2:ls) = map tokenizeBash $ lines packetStr
+        extraStuff = parseExtraHelper $ drop 1 line2
+        Just packetID = Map.lookup "ID" extraStuff
         datetime = line1 !! 0
         protocol = line2 !! 0
         (srcIP,srcPort) = splitOn ':' $ line1 !! 1
         (destIP,destPort) = splitOn ':' $ line1 !! 3
-    in Packet datetime (Connection protocol srcIP srcPort destIP destPort)
+    in Packet packetID datetime (Connection protocol srcIP srcPort destIP destPort)
 
 maliciousPackets :: [Rule] -> [Packet] -> [Alert]
 maliciousPackets rules packets =
@@ -146,11 +172,10 @@ maliciousPacketAlert rules packet =
 
 constructAlert :: Rule -> Packet -> Alert
 constructAlert rule packet =
-    Alert sid connection rule datetime origin description
-    where Packet datetime connection = packet
-          sid = "LOLOLOL" --TODO
-          origin = "LOLOLOL" --TODO
-          description = "LOLOLOL" --TODO
+    Alert packetID connection rule datetime origin description
+    where Packet packetID datetime connection = packet
+          origin = getHardcodedOrigin (sid rule) --hardcoded
+          description = getHardcodedDescription (sid rule) --hardcoded
 
 isMaliciousPacket :: Packet -> Rule -> Bool
 isMaliciousPacket packet rule =
@@ -159,8 +184,8 @@ isMaliciousPacket packet rule =
     && (p'srcPort `elem` map Just r'srcPorts || "any" `elem` r'srcPorts)
     && p'destIP == r'destIP
     && (p'destPort `elem` map Just r'destPorts || "any" `elem` r'destPorts)
-    where AlertRule r'protocol r'srcIP r'srcPorts r'destIP r'destPorts message = rule
-          Packet datetime (Connection p'protocol p'srcIP p'srcPort p'destIP p'destPort) = packet
+    where AlertRule _ _ r'protocol r'srcIP r'srcPorts r'destIP r'destPorts = rule
+          Packet packetID datetime (Connection p'protocol p'srcIP p'srcPort p'destIP p'destPort) = packet
     
 filterNothings :: [Maybe a] -> [a]
 filterNothings =
@@ -209,7 +234,8 @@ splitOn delim str =
 
 parseExtra :: String -> Map.Map String String
 parseExtra extra =
-    Map.fromList . map (removeNothing . (splitOn ':')) . filter (/=";") . tokenizeBash . dropWhile (=='(') $ extra
-    where removeNothing = (\ (a,thing) -> case thing of
-                                            Nothing -> (a,"")
-                                            Just something -> (a,something))
+    parseExtraHelper . tokenizeBash . dropWhile (=='(') $ extra
+
+parseExtraHelper =
+    Map.fromList . map (removeNothing . (splitOn ':')) . filter (/=";")
+    where removeNothing = (\ (a,thing) -> (a,(deMaybe "" id thing)) )
